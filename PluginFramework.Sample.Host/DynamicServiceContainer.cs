@@ -121,6 +121,11 @@ public class DynamicServiceContainer
     {
         lock (_lock)
         {
+            if (descriptor.ImplementationType == null)
+            {
+                return descriptor.ImplementationInstance;
+            }
+
             if (_singletonCache.TryGetValue(descriptor.ImplementationType, out var value))
             {
                 return value;
@@ -160,13 +165,17 @@ public class DynamicServiceContainer
     
     private object? CreateInstance(ServiceDescriptor descriptor)
     {
+        if (descriptor.ImplementationType == null)
+        {
+            return descriptor.ImplementationInstance;
+        }
 
         lock (_lock)
         {
             // 循环依赖判断
-            if (_resolvingTypes.Contains(descriptor.ImplementationType!))
+            if (_resolvingTypes.Contains(descriptor.ImplementationType))
             {
-                throw new InvalidOperationException($"Circular dependency detected for {descriptor.ImplementationType!.Name}");
+                throw new InvalidOperationException($"Circular dependency detected for {descriptor.ImplementationType.Name}");
             }
         }
 
@@ -174,12 +183,12 @@ public class DynamicServiceContainer
 
         lock (_lock)
         {
-            if (!_constructorCache.TryGetValue(descriptor.ImplementationType!, out constructor))
+            if (!_constructorCache.TryGetValue(descriptor.ImplementationType, out constructor))
             {
-                constructor = FindBestMatchingConstructor(descriptor.ImplementationType!);
+                constructor = FindBestMatchingConstructor(descriptor.ImplementationType);
                 if (constructor != null)
                 {
-                    _constructorCache[descriptor.ImplementationType!] = constructor;
+                    _constructorCache[descriptor.ImplementationType] = constructor;
                 }
             }
         }
@@ -191,7 +200,7 @@ public class DynamicServiceContainer
         
         lock (_lock)
         {
-            _resolvingTypes.Add(descriptor.ImplementationType!);
+            _resolvingTypes.Add(descriptor.ImplementationType);
         }
 
         try
@@ -208,7 +217,7 @@ public class DynamicServiceContainer
         {
             lock (_lock)
             {
-                _resolvingTypes.Remove(descriptor.ImplementationType!);
+                _resolvingTypes.Remove(descriptor.ImplementationType);
             }
         }
     }
@@ -282,12 +291,17 @@ public class DynamicServiceContainer
                 var descriptor = descriptors.Last();
                 if (descriptor.Lifetime == ServiceLifetime.Singleton)
                 {
-                    if (!_singletonCache.TryGetValue(descriptor.ImplementationType!, out var value))
+                    if (descriptor.ImplementationType == null)
+                    {
+                        return descriptor.ImplementationInstance;
+                    }
+                    
+                    if (!_singletonCache.TryGetValue(descriptor.ImplementationType, out var value))
                     {
                         value = CreateInstance(descriptor);
-                        _singletonCache[descriptor.ImplementationType!] = value!;
+                        _singletonCache[descriptor.ImplementationType] = value!;
                     }
-                    return _singletonCache[descriptor.ImplementationType!];
+                    return _singletonCache[descriptor.ImplementationType];
                 }
                 
                 return CreateInstance(descriptor);
