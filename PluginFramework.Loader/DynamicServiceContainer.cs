@@ -1,7 +1,7 @@
 using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 
-namespace PluginFramework.Sample.Host;
+namespace PluginFramework.Loader;
 
 public class DynamicServiceContainer
 {
@@ -18,7 +18,7 @@ public class DynamicServiceContainer
     
     private readonly Dictionary<Type, ConstructorInfo> _constructorCache = new();
     
-    private readonly HashSet<Type> _resolvingTypes = new();
+    private readonly ThreadLocal<HashSet<Type>> _resolvingTypes = new(() => []);
     private readonly Lock _lock = new();
 
     public DynamicServiceContainer(IServiceProvider rootProvider)
@@ -57,7 +57,39 @@ public class DynamicServiceContainer
             descriptors.Add(descriptor);
         }
     }
-    
+
+    /// <summary>
+    /// 按类型注册单例实例（非泛型版本）
+    /// </summary>
+    public void RegisterSingleton(Type serviceType, object instance)
+    {
+        lock (_lock)
+        {
+            if (!_dynamicServices.TryGetValue(serviceType, out var descriptors))
+            {
+                descriptors = new List<ServiceDescriptor>();
+                _dynamicServices[serviceType] = descriptors;
+            }
+            var descriptor = ServiceDescriptor.Singleton(serviceType, instance);
+            descriptors.Add(descriptor);
+        }
+    }
+
+    /// <summary>
+    /// 按类型注册（非泛型版本），用于动态扫描后注册
+    /// </summary>
+    public void RegisterTransient(Type serviceType, Type implementationType)
+    {
+        RegisterByType(serviceType, implementationType, ServiceLifetime.Transient);
+    }
+
+    /// <summary>
+    /// 按类型注册单例（非泛型版本）
+    /// </summary>
+    public void RegisterSingleton(Type serviceType, Type implementationType)
+    {
+        RegisterByType(serviceType, implementationType, ServiceLifetime.Singleton);
+    }
     #endregion
 
 
@@ -111,6 +143,52 @@ public class DynamicServiceContainer
     {
         return GetService<TService>() ?? throw new InvalidOperationException($"Service {typeof(TService)} not found");
     }
+
+    /// <summary>
+    /// 按类型获取服务实例（非泛型版本）
+    /// </summary>
+    public object? GetService(Type serviceType)
+    {
+        lock (_lock)
+        {
+            if (_dynamicServices.TryGetValue(serviceType, out var descriptors) && descriptors.Count > 0)
+            {
+                var descriptor = descriptors.Last();
+                return GetServiceInstance(descriptor);
+            }
+        }
+
+        return _rootProvider.GetService(serviceType);
+    }
+
+    /// <summary>
+    /// 按类型获取所有服务实例（非泛型版本）
+    /// </summary>
+    public IEnumerable<object> GetServices(Type serviceType)
+    {
+        var results = new List<object>();
+
+        lock (_lock)
+        {
+            foreach (var service in _rootProvider.GetServices(serviceType))
+            {
+                if (service != null)
+                    results.Add(service);
+            }
+
+            if (_dynamicServices.TryGetValue(serviceType, out var descriptors))
+            {
+                foreach (var descriptor in descriptors)
+                {
+                    var instance = GetServiceInstance(descriptor);
+                    if (instance != null)
+                        results.Add(instance);
+                }
+            }
+        }
+
+        return results;
+    }
     
     #endregion
 
@@ -137,8 +215,11 @@ public class DynamicServiceContainer
     private void Register<TService, TImplementation>(ServiceLifetime serviceLifetime) where TService : class
         where TImplementation : class, TService
     {
-        var serviceType = typeof(TService);
-        var implType = typeof(TImplementation);
+        RegisterByType(typeof(TService), typeof(TImplementation), serviceLifetime);
+    }
+
+    private void RegisterByType(Type serviceType, Type implType, ServiceLifetime serviceLifetime)
+    {
         var key = (serviceType, implType, serviceLifetime);
         lock (_lock)
         {
@@ -146,16 +227,16 @@ public class DynamicServiceContainer
             {
                 return;
             }
-            
-            if (!_dynamicServices.TryGetValue(typeof(TService), out var descriptors))
+
+            if (!_dynamicServices.TryGetValue(serviceType, out var descriptors))
             {
                 descriptors = new List<ServiceDescriptor>();
                 _dynamicServices[serviceType] = descriptors;
             }
-            var descriptor = serviceLifetime == ServiceLifetime.Transient 
+            var descriptor = serviceLifetime == ServiceLifetime.Transient
                 ? ServiceDescriptor.Transient(serviceType, implType)
                 : ServiceDescriptor.Singleton(serviceType, implType);
-            
+
             descriptors.Add(descriptor);
             _registrationIndex.Add(key, true);
             _constructorCache.Clear();
@@ -170,13 +251,9 @@ public class DynamicServiceContainer
             return descriptor.ImplementationInstance;
         }
 
-        lock (_lock)
+        if (_resolvingTypes.Value!.Contains(descriptor.ImplementationType))
         {
-            // 循环依赖判断
-            if (_resolvingTypes.Contains(descriptor.ImplementationType))
-            {
-                throw new InvalidOperationException($"Circular dependency detected for {descriptor.ImplementationType.Name}");
-            }
+            throw new InvalidOperationException($"Circular dependency detected for {descriptor.ImplementationType.Name}");
         }
 
         ConstructorInfo? constructor;
@@ -198,10 +275,7 @@ public class DynamicServiceContainer
 
         var parameters = new List<object?>();
         
-        lock (_lock)
-        {
-            _resolvingTypes.Add(descriptor.ImplementationType);
-        }
+        _resolvingTypes.Value.Add(descriptor.ImplementationType);
 
         try
         {
@@ -215,10 +289,7 @@ public class DynamicServiceContainer
         }
         finally
         {
-            lock (_lock)
-            {
-                _resolvingTypes.Remove(descriptor.ImplementationType);
-            }
+            _resolvingTypes.Value.Remove(descriptor.ImplementationType);
         }
     }
 

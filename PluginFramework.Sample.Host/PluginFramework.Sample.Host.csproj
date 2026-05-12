@@ -27,4 +27,8 @@
       </Page>
     </ItemGroup>
 
+    <ItemGroup>
+      <ProjectReference Include="..\PluginFramework.Loader\PluginFramework.Loader.csproj" />
+    </ItemGroup>
+
 </Project>

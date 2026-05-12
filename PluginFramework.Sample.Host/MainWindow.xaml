@@ -3,28 +3,56 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:PluginFramework.Sample.Host"
         mc:Ignorable="d"
-        Title="MainWindow" Height="450" Width="800">
-    <Grid RowDefinitions="Auto, *">
-        
-        <ToolBar Grid.Row="0">
-            <ItemsControl ItemsSource="{Binding Features}">
+        Title="Plugin Framework - Host" Height="450" Width="800">
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Toolbar：按模块分组显示功能按钮 -->
+        <ToolBar Grid.Row="0" Background="#F0F0F0">
+            <ItemsControl ItemsSource="{Binding ModuleGroups}">
                 <ItemsControl.ItemsPanel>
                     <ItemsPanelTemplate>
-                        <StackPanel Orientation="Horizontal" />
+                        <StackPanel Orientation="Horizontal"/>
                     </ItemsPanelTemplate>
                 </ItemsControl.ItemsPanel>
                 <ItemsControl.ItemTemplate>
                     <DataTemplate>
-                        <Button Content="{Binding Name}" 
-                                Command="{Binding SwitchCommand}"
-                                Margin="2"/>
+                        <Border BorderBrush="#CCC" BorderThickness="0,0,1,0" 
+                                Padding="4,0" Margin="0,0,4,0">
+                            <StackPanel>
+                                <!-- 模块名称（按钮组标题） -->
+                                <TextBlock Text="{Binding Name}" 
+                                           FontSize="10" Foreground="#888"
+                                           Margin="2,2,2,0"/>
+                                <!-- 模块下的功能按钮 -->
+                                <ItemsControl ItemsSource="{Binding Features}">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <StackPanel Orientation="Horizontal"/>
+                                        </ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Button Content="{Binding Name}"
+                                                    Command="{Binding SwitchCommand}"
+                                                    MinWidth="80" Height="28"
+                                                    Margin="2"/>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
         </ToolBar>
-        
+
+        <!-- 内容区域 -->
         <ContentControl Grid.Row="1" Content="{Binding CurrentControl}"/>
-        
     </Grid>
 </Window>

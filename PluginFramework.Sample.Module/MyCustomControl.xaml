@@ -6,7 +6,30 @@
              xmlns:local="clr-namespace:PluginFramework.Sample.Module"
              mc:Ignorable="d" 
              d:DesignHeight="450" d:DesignWidth="800">
-    <Grid VerticalAlignment="Center" HorizontalAlignment="Center">
-        <TextBlock>Hello from MyCustomControl</TextBlock>
+    <Grid Margin="20">
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center">
+            <TextBlock Text="{Binding Message}" 
+                       FontSize="24" 
+                       HorizontalAlignment="Center"
+                       Margin="0,0,0,20"/>
+            
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                <!-- [Operation] refresh - 刷新数据 -->
+                <Button Content="刷新数据" 
+                        Command="{Binding RefreshCommand}"
+                        Width="120" Height="36" Margin="5"
+                        Style="{StaticResource {x:Type Button}}"/>
+                
+                <!-- [Operation] adminAction - 管理员操作（通过权限自动隐藏） -->
+                <Button Content="管理员操作" 
+                        Command="{Binding AdminActionCommand}"
+                        Width="120" Height="36" Margin="5"/>
+                
+                <!-- 普通命令（未标记 [Operation]） -->
+                <Button Content="清空" 
+                        Command="{Binding ClearCommand}"
+                        Width="120" Height="36" Margin="5"/>
+            </StackPanel>
+        </StackPanel>
     </Grid>
 </UserControl>
