@@ -16,20 +16,21 @@ public partial class MyCustomControlViewModel : ObservableObject
     private string _message = "欢迎使用自定义功能";
 
     /// <summary>
-    /// [Operation] 标记的命令会被扫描为 IOperation
-    /// </summary>
-    [Operation("refresh", Name = "刷新数据")]
-    [RelayCommand]
-    private void Refresh()
-    {
-        Message = $"数据已刷新: {DateTime.Now:HH:mm:ss}";
-    }
+/// [Operation] 标记的命令会被扫描为 IOperation，
+/// 权限 key = "sample:myCustom:refresh"
+/// </summary>
+[Operation("refresh", Name = "刷新数据")]
+[RelayCommand]
+private void Refresh()
+{
+    Message = $"数据已刷新: {DateTime.Now:HH:mm:ss}";
+}
 
-    /// <summary>
-    /// 带权限限制的操作
-    /// </summary>
-    [Operation("adminAction", Name = "管理员操作", RequiredRoles = new[] { "Admin" })]
-    [RelayCommand]
+/// <summary>
+/// 权限 key = "sample:myCustom:adminAction"
+/// 只有拥有此 key 的用户才能看到并执行
+/// </summary>
+[Operation("adminAction", Name = "管理员操作")]
     private void AdminAction()
     {
         Message = "管理员操作已执行";

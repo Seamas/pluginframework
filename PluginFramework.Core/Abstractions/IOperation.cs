@@ -1,7 +1,8 @@
 namespace PluginFramework.Core.Abstractions;
 
 /// <summary>
-/// 代表一个功能操作，对应 UserControl 内部的按钮、右键菜单等
+/// 代表一个功能操作，对应 UserControl 内部的按钮、右键菜单等。
+/// 权限通过操作码(permission key)控制，格式: "ModuleCode:FeatureCode:OperationCode"
 /// </summary>
 public interface IOperation
 {
@@ -13,7 +14,4 @@ public interface IOperation
 
     /// <summary>操作描述</summary>
     string? Description { get; }
-
-    /// <summary>执行此操作所需的角色，为空表示无权限限制</summary>
-    string[]? RequiredRoles { get; }
 }

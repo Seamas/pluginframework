@@ -60,12 +60,23 @@ public partial class App
         {
             var container = Host.Services.GetRequiredService<DynamicServiceContainer>();
 
-            // 1. 注册当前用户上下文
+            // 1. 注册当前用户上下文（模拟从数据库加载权限 key）
+            var userPermissionKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            {
+                // 内置功能权限
+                "__builtin__:default:*",
+                "__builtin__:inner:*",
+
+                // 外部模块权限（模拟：admin 用户有所有操作权限）
+                "sample:myCustom:refresh",
+                "sample:myCustom:adminAction",
+            };
+
             var userContext = new UserContext
             {
                 UserId = "123",
                 UserName = "admin",
-                Roles = new[] { "Admin", "User" }
+                PermissionKeys = userPermissionKeys
             };
             container.RegisterSingleton<IUserContext>(userContext);
 
@@ -76,7 +87,7 @@ public partial class App
             if (!System.IO.Directory.Exists(modulesDir))
                 System.IO.Directory.CreateDirectory(modulesDir);
 
-            var loadedModules = moduleLoader.LoadModulesAsync(modulesDir, userContext.Roles)
+            var loadedModules = moduleLoader.LoadModulesAsync(modulesDir, userPermissionKeys)
                 .GetAwaiter().GetResult();
 
             // 3. 将内置功能包装为伪模块，合并到列表头部
@@ -128,8 +139,7 @@ public partial class App
             Code = "inner",
             Name = "管理界面",
             ViewModelType = typeof(object),
-            ViewType = typeof(InnerControl),
-            RequiredRoles = new[] { "Admin" }
+            ViewType = typeof(InnerControl)
         });
 
         return module;
@@ -140,14 +150,16 @@ public interface IUserContext
 {
     string UserId { get; set; }
     string UserName { get; set; }
-    string[] Roles { get; set; }
+
+    /// <summary>用户拥有的权限 key 集合（如 "sample:myCustom:refresh"）</summary>
+    HashSet<string> PermissionKeys { get; set; }
 }
 
 public class UserContext : IUserContext
 {
     public string UserId { get; set; } = string.Empty;
     public string UserName { get; set; } = string.Empty;
-    public string[] Roles { get; set; } = Array.Empty<string>();
+    public HashSet<string> PermissionKeys { get; set; } = new();
 }
 
 public class AdminService

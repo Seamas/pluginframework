@@ -6,7 +6,8 @@ using PluginFramework.Loader.Metadata;
 namespace PluginFramework.Loader;
 
 /// <summary>
-/// 默认模块加载器实现
+/// 默认模块加载器实现。
+/// 权限过滤基于 operation-key：用户拥有任何操作权限即自动级联显示 Feature 和 Module。
 /// </summary>
 public class DefaultModuleLoader : IModuleLoader
 {
@@ -20,12 +21,11 @@ public class DefaultModuleLoader : IModuleLoader
     }
 
     /// <inheritdoc />
-    public Task<IReadOnlyList<ModuleMeta>> LoadModulesAsync(string modulesDirectory, string[] userRoles)
+    public Task<IReadOnlyList<ModuleMeta>> LoadModulesAsync(
+        string modulesDirectory, HashSet<string> userPermissionKeys)
     {
         if (!Directory.Exists(modulesDirectory))
-        {
             return Task.FromResult<IReadOnlyList<ModuleMeta>>(Array.Empty<ModuleMeta>());
-        }
 
         var allModules = new List<ModuleMeta>();
         var dllFiles = Directory.GetFiles(modulesDirectory, "*.dll", SearchOption.TopDirectoryOnly);
@@ -39,8 +39,8 @@ public class DefaultModuleLoader : IModuleLoader
 
                 foreach (var module in moduleMetas)
                 {
-                    // 1. 检查模块级权限
-                    if (!HasAccess(module.RequiredRoles, userRoles))
+                    // 1. 检查模块级权限（是否有任何 Feature 可访问）
+                    if (!PermissionKeyHelper.HasModulePermission(userPermissionKeys, module.Code))
                         continue;
 
                     // 2. 调用 ConfigureServices 注册模块的 DI 服务
@@ -57,56 +57,32 @@ public class DefaultModuleLoader : IModuleLoader
                     }
 
                     // 4. 将模块的 DI 注册转移到 DynamicServiceContainer
-                    foreach (var descriptor in tempServices)
-                    {
-                        if (descriptor.ImplementationType != null)
-                        {
-                            switch (descriptor.Lifetime)
-                            {
-                                case ServiceLifetime.Singleton:
-                                    _container.RegisterSingleton(descriptor.ServiceType, descriptor.ImplementationType);
-                                    break;
-                                case ServiceLifetime.Transient:
-                                    _container.RegisterTransient(descriptor.ServiceType, descriptor.ImplementationType);
-                                    break;
-                                case ServiceLifetime.Scoped:
-                                    _container.RegisterTransient(descriptor.ServiceType, descriptor.ImplementationType);
-                                    break;
-                            }
-                        }
-                        else if (descriptor.ImplementationInstance != null)
-                        {
-                            _container.RegisterSingleton(descriptor.ServiceType, descriptor.ImplementationInstance);
-                        }
-                    }
+                    TransferToContainer(tempServices);
 
-                    // 5. 过滤 Feature（按权限）
-                    var allowedFeatures = module.Features
-                        .Where(f => HasAccess(f.RequiredRoles, userRoles))
-                        .ToList();
-
-                    // 6. 过滤每个 Feature 下的 Operation（按权限）
-                    foreach (var feature in allowedFeatures)
+                    // 5. 过滤 Feature（按权限 key 级联）
+                    var allowedFeatures = new List<FeatureMeta>();
+                    foreach (var f in module.Features.Cast<FeatureMeta>())
                     {
-                        var allowedOps = feature.Operations
-                            .Where(o => HasAccess(o.RequiredRoles, userRoles))
+                        if (!PermissionKeyHelper.HasFeaturePermission(userPermissionKeys, module.Code, f.Code))
+                            continue;
+
+                        // 6. 过滤 Operation（按权限 key）
+                        var allowedOps = f.Operations
+                            .Cast<OperationMeta>()
+                            .Where(o => PermissionKeyHelper.HasOperationPermission(
+                                userPermissionKeys, module.Code, f.Code, o.Code))
                             .ToList();
 
-                        feature.Operations.Clear();
-                        foreach (var op in allowedOps)
-                        {
-                            feature.Operations.Add(op);
-                        }
+                        f.Operations.Clear();
+                        foreach (var op in allowedOps) f.Operations.Add(op);
+
+                        allowedFeatures.Add(f);
                     }
 
-                    // 只保留有 Feature 的模块
                     if (allowedFeatures.Count > 0)
                     {
                         module.Features.Clear();
-                        foreach (var feature in allowedFeatures)
-                        {
-                            module.Features.Add(feature);
-                        }
+                        foreach (var f in allowedFeatures) module.Features.Add(f);
                         allModules.Add(module);
                     }
                 }
@@ -120,15 +96,27 @@ public class DefaultModuleLoader : IModuleLoader
         return Task.FromResult<IReadOnlyList<ModuleMeta>>(allModules);
     }
 
-    /// <summary>
-    /// 检查用户角色是否满足权限要求
-    /// </summary>
-    private static bool HasAccess(string[]? requiredRoles, string[] userRoles)
+    private void TransferToContainer(ServiceCollection tempServices)
     {
-        if (requiredRoles == null || requiredRoles.Length == 0)
-            return true;
-        if (userRoles.Length == 0)
-            return false;
-        return requiredRoles.Any(r => userRoles.Contains(r, StringComparer.OrdinalIgnoreCase));
+        foreach (var descriptor in tempServices)
+        {
+            if (descriptor.ImplementationType != null)
+            {
+                switch (descriptor.Lifetime)
+                {
+                    case ServiceLifetime.Singleton:
+                        _container.RegisterSingleton(descriptor.ServiceType, descriptor.ImplementationType);
+                        break;
+                    case ServiceLifetime.Transient:
+                    case ServiceLifetime.Scoped:
+                        _container.RegisterTransient(descriptor.ServiceType, descriptor.ImplementationType);
+                        break;
+                }
+            }
+            else if (descriptor.ImplementationInstance != null)
+            {
+                _container.RegisterSingleton(descriptor.ServiceType, descriptor.ImplementationInstance);
+            }
+        }
     }
 }

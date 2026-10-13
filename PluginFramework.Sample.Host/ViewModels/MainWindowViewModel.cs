@@ -42,7 +42,7 @@ public partial class MainWindowViewModel : ObservableObject
     /// <summary>
     /// 用已加载的模块数据初始化 Toolbar
     /// </summary>
-    public void InitializeFromModules(IReadOnlyList<PluginFramework.Loader.Metadata.ModuleMeta> modules)
+    public void InitializeFromModules(IReadOnlyList<ModuleMeta> modules)
     {
         ModuleGroups.Clear();
         _switchCommands.Clear();
@@ -101,45 +101,11 @@ public partial class MainWindowViewModel : ObservableObject
         {
             view.DataContext = viewModel;
 
-            // 根据权限控制 Operation 按钮的可见性
-            ApplyOperationVisibility(view, featureData);
+            // Operations 已在 DefaultModuleLoader 中按权限 key 过滤，
+            // 到达此处时 featureData.Meta.Operations 仅包含有权执行的操作。
+            // UI 可通过绑定到 ViewModel 的权限判断方法自行控制按钮显隐。
         }
 
         CurrentControl = view;
-    }
-
-    /// <summary>
-    /// 根据权限过滤，隐藏/禁用无权限的操作按钮
-    /// </summary>
-    private static void ApplyOperationVisibility(UserControl view, FeatureMetaData featureData)
-    {
-        var allowedOpCodes = featureData.Meta.Operations
-            .Select(o => o.Code)
-            .ToHashSet(StringComparer.OrdinalIgnoreCase);
-
-        // 遍历 UserControl 的所有子元素
-        foreach (var child in FindVisualChildren<FrameworkElement>(view))
-        {
-            // 检查 Tag 属性中是否标记了 OperationCode
-            if (child.Tag is string operationCode)
-            {
-                child.Visibility = allowedOpCodes.Contains(operationCode)
-                    ? Visibility.Visible
-                    : Visibility.Collapsed;
-            }
-        }
-    }
-
-    private static IEnumerable<T> FindVisualChildren<T>(DependencyObject parent) where T : DependencyObject
-    {
-        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
-        {
-            var child = VisualTreeHelper.GetChild(parent, i);
-            if (child is T typedChild)
-                yield return typedChild;
-
-            foreach (var nested in FindVisualChildren<T>(child))
-                yield return nested;
-        }
     }
 }

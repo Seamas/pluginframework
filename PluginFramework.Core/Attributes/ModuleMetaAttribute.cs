@@ -15,7 +15,4 @@ public class ModuleMetaAttribute(string code) : Attribute
 
     /// <summary>模块描述</summary>
     public string? Description { get; init; }
-
-    /// <summary>访问此模块需要的角色，为空表示无权限限制</summary>
-    public string[]? RequiredRoles { get; init; }
 }

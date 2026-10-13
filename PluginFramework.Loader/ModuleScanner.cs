@@ -41,7 +41,6 @@ public class ModuleScanner
                 Code = moduleAttr.Code,
                 Name = moduleAttr.Name,
                 Description = moduleAttr.Description,
-                RequiredRoles = moduleAttr.RequiredRoles,
                 Assembly = assembly,
                 ConfigureType = configureType
             };
@@ -68,8 +67,7 @@ public class ModuleScanner
                     Name = featureAttr.Name,
                     Description = featureAttr.Description,
                     ViewModelType = viewModelType,
-                    ViewType = viewType,
-                    RequiredRoles = featureAttr.RequiredRoles
+                    ViewType = viewType
                 };
 
                 // 3. 扫描 ViewModel 上带 [Operation] 的 ICommand 属性
@@ -108,7 +106,6 @@ public class ModuleScanner
                 Code = opAttr.Code,
                 Name = opAttr.Name,
                 Description = opAttr.Description,
-                RequiredRoles = opAttr.RequiredRoles,
                 CommandProperty = prop
             });
         }
@@ -133,7 +130,6 @@ public class ModuleScanner
                     Code = opAttr.Code,
                     Name = opAttr.Name,
                     Description = opAttr.Description,
-                    RequiredRoles = opAttr.RequiredRoles,
                     CommandProperty = commandProp
                 });
             }

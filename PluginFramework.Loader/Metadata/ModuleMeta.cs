@@ -4,14 +4,14 @@ using PluginFramework.Core.Abstractions;
 namespace PluginFramework.Loader.Metadata;
 
 /// <summary>
-/// 模块的元数据，对应一个被 [ModuleMeta] 标记的 IModuleConfigure 实现类所在的 Assembly
+/// 模块的元数据，对应一个被 [ModuleMeta] 标记的 IModuleConfigure 实现类所在的 Assembly。
+/// 可见性由下属 Feature/Operation 的权限 key 级联决定。
 /// </summary>
 public class ModuleMeta : IModule
 {
     public string Code { get; init; } = string.Empty;
     public string Name { get; init; } = string.Empty;
     public string? Description { get; init; }
-    public string[]? RequiredRoles { get; init; }
 
     /// <summary>模块所在的 Assembly</summary>
     public Assembly Assembly { get; init; } = null!;
